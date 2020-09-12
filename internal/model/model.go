@@ -19,6 +19,11 @@ type Model struct {
 	Isdel      uint8  `json:"isdel"`
 }
 
+const (
+	STATE_OPEN  = 1
+	STATE_CLOSE = 0
+)
+
 func NewDBEngine(databaseSetting *setting.DatabaseSettingS) (*gorm.DB, error) {
 	db, err := gorm.Open(databaseSetting.DBType, fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=%s&parseTime=%t&loc=Local",
 		databaseSetting.UserName,
