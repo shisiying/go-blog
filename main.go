@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"flag"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/natefinch/lumberjack"
 	"github.com/shisiying/go-blog/global"
@@ -11,7 +13,10 @@ import (
 	"github.com/shisiying/go-blog/pkg/setting"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -19,6 +24,12 @@ var (
 	port    string
 	runMode string
 	config  string
+
+	isVersion bool
+
+	buildTime    string
+	buildVersion string
+	gitCommitId  string
 )
 
 func init() {
@@ -69,6 +80,12 @@ func setupDBEngine() error {
 // @description Go-blog
 
 func main() {
+	if isVersion {
+		fmt.Printf("build_time:%s\n", buildTime)
+		fmt.Printf("build_version:%s\n", buildVersion)
+		fmt.Printf("git_commit_id:%s\n", gitCommitId)
+		return
+	}
 	gin.SetMode(global.ServerSetting.RunMode)
 	router := routers.NewRouter()
 
@@ -79,6 +96,27 @@ func main() {
 		WriteTimeout:   global.ServerSetting.WriteTimeOut,
 		MaxHeaderBytes: 1 << 20,
 	}
+
+	go func() {
+		if err := s.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("s.ListenAndServe err: %v", err)
+		}
+
+		//等待中断信号
+		quit := make(chan os.Signal)
+		//接收 syscall.SIGINT 和sysycall.SIGTERM信号
+		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+		<-quit
+		log.Println("Shuting down server...")
+
+		//最大时间控制，通知该服务端它有5s的时间来处理原有的请求
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := s.Shutdown(ctx); err != nil {
+			log.Fatal("server forced to shutdown:", err)
+		}
+		log.Println("server exiting")
+	}()
 
 	s.ListenAndServe()
 }
@@ -135,6 +173,7 @@ func setupFlag() error {
 	flag.StringVar(&port, "port", "", "启动端口")
 	flag.StringVar(&runMode, "mode", "", "启动模式")
 	flag.StringVar(&config, "config", "", "指定要使用的配置文件路径")
+	flag.BoolVar(&isVersion, "version", false, "编译信息")
 	flag.Parse()
 
 	return nil
