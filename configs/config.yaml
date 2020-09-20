@@ -25,7 +25,7 @@ Email:
   IsSSL: true
   From: xxx
   To:
-    - xxx
+    - xxx1
 JWT:
   Secret: sevenshi
   Issuer: blog-service
